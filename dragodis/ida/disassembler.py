@@ -184,7 +184,7 @@ class IDARemoteDisassembler(IDADisassembler):
         "sync_request_timeout": 60
     }
 
-    def __init__(self, input_path, is_64_bit=None, ida_path=None, timeout=None, processor=None, detach=False, **unused):
+    def __init__(self, input_path, is_64_bit=None, ida_path=None, timeout=None, processor=None, detach=False, should_autoanalyze=True, **unused):
         """
         Initializes IDA disassembler.
 
@@ -210,7 +210,7 @@ class IDARemoteDisassembler(IDADisassembler):
         self._script_path = ida_server.__file__
         if timeout is not None:
             self._rpyc_config = dict(self._rpyc_config)
-            self._rpyc_config["sync_request_timeout"] = timeout
+            self._rpyc_config["sync_request_timeout"] = None
 
         # Determine if 64 bit.
         if is_64_bit is None:
@@ -240,6 +240,7 @@ class IDARemoteDisassembler(IDADisassembler):
         self._running = False
 
         self._detach = detach and sys.platform != "win32"
+        self._should_autoanalyze = should_autoanalyze
         self._socket_path = None
         self._process = None
         self._bridge = None
@@ -348,7 +349,7 @@ class IDARemoteDisassembler(IDADisassembler):
         self._ida_intel: ida_intel = self._bridge.root.getmodule("ida_intel")
         self._ida_helpers: ida_helpers = self._bridge.root.getmodule("ida_helpers")
 
-    def unix_connect(self, socket_path, retry=10) -> rpyc.Connection:
+    def unix_connect(self, socket_path, retry=20) -> rpyc.Connection:
         """
         Connects to bridge using unix socket.
         """
@@ -366,7 +367,7 @@ class IDARemoteDisassembler(IDADisassembler):
 
         raise DragodisError(f"Could not connect to {socket_path} after {retry} tries.")
 
-    def win_connect(self, pipe_name, retry=10) -> rpyc.Connection:
+    def win_connect(self, pipe_name, retry=20) -> rpyc.Connection:
         """
         Connects to bridge using Windows named pipe.
         """
@@ -409,6 +410,7 @@ class IDARemoteDisassembler(IDADisassembler):
             command = [
                 self._ida_exe,
                 "-P",
+                "-a",
                 "-A",
                 f'-S""{script_path}" "{pipe_name or socket_path}""',
                 f'-L"{self.input_path}_ida.log"',
@@ -443,7 +445,12 @@ class IDARemoteDisassembler(IDADisassembler):
         # Keep a hold of the root remote object to prevent rpyc from prematurely closing on us.
         self._root = self._bridge.root
         self._running = True
-        self._idc.auto_wait()
+        if self._should_autoanalyze:
+            logger.debug('Running autoanalysis.')
+            self._idc.set_flag(self._idc.INF_GENFLAGS, self._idc.INFFL_AUTO, 1)
+            self._idc.auto_wait()        
+        else:
+            logger.debug('Skipping autoanalysis.')
 
         logger.debug("IDA Disassembler ready!")
 
