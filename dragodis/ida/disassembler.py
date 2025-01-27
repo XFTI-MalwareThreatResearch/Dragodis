@@ -184,7 +184,7 @@ class IDARemoteDisassembler(IDADisassembler):
         "sync_request_timeout": 60
     }
 
-    def __init__(self, input_path, is_64_bit=None, ida_path=None, timeout=None, processor=None, detach=False, should_autoanalyze=True, **unused):
+    def __init__(self, input_path, is_64_bit=None, ida_path=None, timeout=None, processor=None, detach=False, analyze=True, **unused):
         """
         Initializes IDA disassembler.
 
@@ -199,6 +199,7 @@ class IDARemoteDisassembler(IDADisassembler):
         :param detach: Detach the IDA subprocess from the parent process group.
             This will cause signals to no longer propagate.
             (Linux only)
+        :param analyze: Determines whether autoanalysis should be conducted on the input file at IDA startup.
         """
         super().__init__(input_path, processor=processor)
         self._ida_path = ida_path or os.environ.get("IDA_INSTALL_DIR", os.environ.get("IDA_DIR"))
@@ -240,7 +241,7 @@ class IDARemoteDisassembler(IDADisassembler):
         self._running = False
 
         self._detach = detach and sys.platform != "win32"
-        self._should_autoanalyze = should_autoanalyze
+        self._analyze = analyze
         self._socket_path = None
         self._process = None
         self._bridge = None
@@ -445,10 +446,8 @@ class IDARemoteDisassembler(IDADisassembler):
         # Keep a hold of the root remote object to prevent rpyc from prematurely closing on us.
         self._root = self._bridge.root
         self._running = True
-        if self._should_autoanalyze:
-            logger.debug('Running autoanalysis.')
-            self._idc.set_flag(self._idc.INF_GENFLAGS, self._idc.INFFL_AUTO, 1)
-            self._idc.auto_wait()        
+        if self._analyze:
+            self.analyze()
         else:
             logger.debug('Skipping autoanalysis.')
 
@@ -513,6 +512,14 @@ class IDARemoteDisassembler(IDADisassembler):
         Good for functions that we don't care to get results back from.
         """
         return rpyc.async_(proxy_func)
+    
+    def analyze(self) -> None:
+        """
+        Instruct IDA to initiate and wait for auto analysis completion.
+        """
+        logger.debug('Running autoanalysis.')
+        self._idc.set_flag(self._idc.INF_GENFLAGS, self._idc.INFFL_AUTO, 1)
+        self._idc.auto_wait()
 
     def teleport(self, func: Callable) -> Callable:
         def wrapper(*args, **kwargs):
