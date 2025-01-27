@@ -453,8 +453,6 @@ class IDARemoteDisassembler(IDADisassembler):
             self.analyze()
         else:
             logger.debug('Skipping autoanalysis.')
-        # Keep a hold of the root remote object to prevent rpyc from prematurely closing on us.
-        self._root = self._bridge.root
         self._running = True
         logger.debug("IDA Disassembler ready!")
 
