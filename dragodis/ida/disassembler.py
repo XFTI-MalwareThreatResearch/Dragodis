@@ -184,7 +184,7 @@ class IDARemoteDisassembler(IDADisassembler):
         "sync_request_timeout": 60
     }
 
-    def __init__(self, input_path, is_64_bit=None, ida_path=None, timeout=None, processor=None, detach=False, analyze=True, **unused):
+    def __init__(self, input_path, is_64_bit=None, ida_path=None, timeout=60, processor=None, detach=False, analyze=True, **unused):
         """
         Initializes IDA disassembler.
 
@@ -209,8 +209,11 @@ class IDARemoteDisassembler(IDADisassembler):
                 "Please provide it during instantiation or set the IDA_INSTALL_DIR environment variable."
             )
         self._script_path = ida_server.__file__
-        if timeout is not None:
-            self._rpyc_config = dict(self._rpyc_config)
+        self._rpyc_config = dict(self._rpyc_config)
+        if timeout <= 0:
+            #Treat zero timeouts or -1 timeouts as infinite.
+            self._rpyc_config["sync_request_timeout"] = None
+        else:
             self._rpyc_config["sync_request_timeout"] = timeout
 
         # Determine if 64 bit.
@@ -433,9 +436,7 @@ class IDARemoteDisassembler(IDADisassembler):
         finally:
             os.chdir(orig_cwd)
     
-        original_timeout = self._rpyc_config['sync_request_timeout']
         #For the initial connection, set rpyc_timeout to None so that auto_wait() is allowed to complete.
-        self._rpyc_config['sync_request_timeout'] = None
         logger.debug(f"Initializing autoanalysis IDA Bridge connection...")
         if socket_path:
             self._bridge = self.unix_connect(socket_path)
@@ -449,26 +450,10 @@ class IDARemoteDisassembler(IDADisassembler):
         self._initialize_bridge()
         # Keep a hold of the root remote object to prevent rpyc from prematurely closing on us.
         self._root = self._bridge.root
-        self._rpyc_config['sync_request_timeout'] = original_timeout
-
         if self._analyze:
             self.analyze()
         else:
             logger.debug('Skipping autoanalysis.')
-        #Close the bridge once auto analysis is complete.  Re initialize the bridge later with a proper timeout.
-        self._bridge.close()
-
-        logger.debug(f"Initializing IDA Bridge connection...")
-        if socket_path:
-            self._bridge = self.unix_connect(socket_path)
-            # Remember socket path so we can close it later.
-            self._socket_path = socket_path
-        elif pipe_name:
-            self._bridge = self.win_connect(pipe_name)
-        else:
-            raise RuntimeError("Unexpected error. Failed to setup socket or pipe.")
-
-        self._initialize_bridge()
         # Keep a hold of the root remote object to prevent rpyc from prematurely closing on us.
         self._root = self._bridge.root
         self._running = True
