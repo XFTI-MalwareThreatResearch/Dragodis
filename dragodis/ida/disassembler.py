@@ -436,8 +436,7 @@ class IDARemoteDisassembler(IDADisassembler):
         finally:
             os.chdir(orig_cwd)
     
-        #For the initial connection, set rpyc_timeout to None so that auto_wait() is allowed to complete.
-        logger.debug(f"Initializing autoanalysis IDA Bridge connection...")
+        logger.debug(f"Initializing IDA Bridge connection...")
         if socket_path:
             self._bridge = self.unix_connect(socket_path)
             # Remember socket path so we can close it later.
