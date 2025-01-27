@@ -60,6 +60,17 @@ def main():
         socket_path = idc.ARGV[1]
         server = OneShotServer(SlaveService, socket_path=socket_path, auto_register=False)
         server.start()
+    #The first connection is specifically for auto analysis.  This allows setting a timeout of None to allow for very long autoanalysis waittime.
+    #This connection can then have a reasonable timeout value to prevent issues if IDA crashes.
+    if sys.platform == "win32":
+        pipe_name = idc.ARGV[1]
+        stream = NamedPipeStream.create_server(pipe_name)
+        with rpyc.classic.connect_stream(stream) as srv:
+            srv.serve_all()
+    else:
+        socket_path = idc.ARGV[1]
+        server = OneShotServer(SlaveService, socket_path=socket_path, auto_register=False)
+        server.start()
 
     idc.qexit(0)
 
