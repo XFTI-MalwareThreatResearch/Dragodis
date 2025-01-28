@@ -518,11 +518,11 @@ class IDARemoteDisassembler(IDADisassembler):
     def analyze(self) -> None:
         """
         Instruct IDA to initiate and wait for auto analysis completion.
-        NOTE: This function is likely subject to the timeout value provided in the IDARemoteDisassembler constructor.
         """
         logger.debug('Running autoanalysis.')
         self._idc.set_flag(self._idc.INF_GENFLAGS, self._idc.INFFL_AUTO, 1)
-        self._idc.auto_wait()
+        #To avoid timeouts, run it as async but block until complete here.
+        self._async(self._idc.auto_wait)().wait()
 
     def teleport(self, func: Callable) -> Callable:
         def wrapper(*args, **kwargs):
