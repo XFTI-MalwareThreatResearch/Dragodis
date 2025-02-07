@@ -448,11 +448,11 @@ class IDARemoteDisassembler(IDADisassembler):
         self._initialize_bridge()
         # Keep a hold of the root remote object to prevent rpyc from prematurely closing on us.
         self._root = self._bridge.root
+        self._running = True
         if self._analyze:
             self.analyze()
         else:
             logger.debug('Skipping autoanalysis.')
-        self._running = True
         logger.debug("IDA Disassembler ready!")
 
     def stop(self, *exc_info):
@@ -519,6 +519,9 @@ class IDARemoteDisassembler(IDADisassembler):
         """
         Instruct IDA to initiate and wait for auto analysis completion.
         """
+        if not self._running:
+            logger.error('Cannot run IDARemoteDisassembler.analyze() without a connected IDA instance.')
+            return
         logger.debug('Running autoanalysis.')
         self._idc.set_flag(self._idc.INF_GENFLAGS, self._idc.INFFL_AUTO, 1)
         #To avoid timeouts, run it as async but block until complete here.
