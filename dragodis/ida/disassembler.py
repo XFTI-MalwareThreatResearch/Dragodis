@@ -158,8 +158,14 @@ class IDALocalDisassembler(IDADisassembler):
         self._ida_typeinf = ida_typeinf
         import ida_entry
         self._ida_entry = ida_entry
-        import ida_struct
-        self._ida_struct = ida_struct
+        try:
+            """
+            In IDA 8.5 and 9.0 API, ida_struct has been completely removed.
+            """
+            import ida_struct
+            self._ida_struct = ida_struct
+        except ImportError:
+            self._ida_struct = None
         import ida_frame
         self._ida_frame = ida_frame
         import ida_search
@@ -229,12 +235,29 @@ class IDARemoteDisassembler(IDADisassembler):
 
         # Find ida executable within ida_dir.
         # TODO: Should we just always open with ida64?
-        ida_exe_re = re.compile(r"idaq?64(\.exe)?$" if is_64_bit else r"idaq?(\.exe)?$")
+        ida_exe_re64 = re.compile(r"idaq?64(\.exe)?$")
+        ida_exe_re32 = re.compile(r"idaq?(\.exe)?$")
+        if is_64_bit:
+            ida_exe_re = ida_exe_re64
+        else:
+            ida_exe_re = ida_exe_re32
+        self._ida_exe = None
         for filename in os.listdir(self._ida_path):
             if ida_exe_re.match(filename):
                 self._ida_exe = os.path.abspath(os.path.join(self._ida_path, filename))
                 break
         else:
+            """
+            IDA 8.5 + No longer has ida64.exe. Search for ida.exe if ida64 isnt present on a 64 bit file.
+            May be useful to eventually do a version check, but I dont think theres a scenario where ida64 is missing and ida.exe is only 32 bit.
+            """
+            if is_64_bit:
+                for filename in os.listdir(self._ida_path):
+                    if ida_exe_re32.match(filename):
+                        self._ida_exe = os.path.abspath(os.path.join(self._ida_path, filename))
+                        break
+
+        if self._ida_exe is None:
             raise NotInstalledError(f"Unable to find ida executable within: {self._ida_path}")
 
         self._running = False
@@ -336,7 +359,13 @@ class IDARemoteDisassembler(IDADisassembler):
         self._ida_loader: ida_loader = self._bridge.root.getmodule("ida_loader")
         self._ida_typeinf: ida_typeinf = self._bridge.root.getmodule("ida_typeinf")
         self._ida_entry: ida_entry = self._bridge.root.getmodule("ida_entry")
-        self._ida_struct: ida_struct = self._bridge.root.getmodule("ida_struct")
+        try:
+            """
+            IDA 8.5 + no longer has ida_struct.
+            """
+            self._ida_struct: ida_struct = self._bridge.root.getmodule("ida_struct")
+        except ImportError:
+            self._ida_struct = None
         self._ida_frame: ida_frame = self._bridge.root.getmodule("ida_frame")
         self._ida_search: ida_search = self._bridge.root.getmodule("ida_search")
 

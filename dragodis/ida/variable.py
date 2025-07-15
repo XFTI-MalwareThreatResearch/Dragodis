@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
     from dragodis.ida.flat import IDAFlatAPI
-    from dragodis.ida.stack import IDAStackFrame
+    from dragodis.ida.stack import IDAStackFrame, IDA9StackFrame
     import ida_struct
 
 
@@ -36,6 +36,47 @@ class IDAGlobalVariable(GlobalVariable):
     @property
     def data_type(self) -> IDADataType:
         return IDADataType(self._ida, address=self._address)
+    
+class IDA9StackVariable(StackVariable):
+
+    """
+    This class is equivalent to IDAStackVariable
+    Except it contains API changes for IDA 8.5 / 9.0 +
+    """
+
+    def __init__(self, ida: IDAFlatAPI, frame: IDA9StackFrame, member: "ida_typeinf.udm_t"):
+        self._ida = ida
+        self._frame = frame
+        self._member = member
+        self._member_index = frame._frame.find_udm(self._member, self._ida._ida_typeinf.STRMEM_OFFSET)
+        assert self._member_index != -1
+
+    def __eq__(self, other: "IDAVariable") -> bool:
+        return self._frame == other._frame and self._member.offset == other._member.offset
+
+    @property
+    def stack_offset(self) -> int:
+        return (self._member.offset // 8 ) - self._frame._base_offset
+
+    @property
+    def name(self) -> str:
+        return self._member.name or ""
+
+    @name.setter
+    def name(self, new_name: str):
+        self._frame.rename_udm(self._member_index, new_name, 0)
+
+    @property
+    def data_type(self) -> IDADataType:
+        tif = self._ida._ida_typeinf.tinfo_t()
+        success = self._ida._ida_typeinf.guess_tinfo(tif, self._frame.get_udm_tid(self._member_index))
+        if not success:
+            raise RuntimeError("Unexpected error getting type information.")
+        return IDADataType(self._ida, tif)  #, self._member.flag & self._ida._idc.DT_TYPE)
+
+    @property
+    def size(self) -> int:
+        return self._member.size
 
 
 class IDAStackVariable(StackVariable):
@@ -73,4 +114,4 @@ class IDAStackVariable(StackVariable):
         return self._ida._ida_struct.get_member_size(self._member)
 
 
-IDAVariable = Union[IDAGlobalVariable, IDAStackVariable]
+IDAVariable = Union[IDAGlobalVariable, IDAStackVariable, IDA9StackVariable]

@@ -35,6 +35,10 @@ class IDAFlatAPI(FlatAPI, IDADisassembler):
 
     def _bytes_loaded(self, addr: int, num_bytes: int) -> bool:
         return self._ida_helpers.is_loaded(addr, num_bytes)
+    
+    @property
+    def ida_version(self) -> int:
+        return self._idaapi.IDA_SDK_VERSION
 
     @property
     def processor_name(self) -> str:
