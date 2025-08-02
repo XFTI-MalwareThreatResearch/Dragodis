@@ -145,7 +145,7 @@ class IDAFlatAPI(FlatAPI, IDADisassembler):
             if self.ida_version < 850:
                 flag = self._ida_search.SEARCH_DOWN
             else:
-                flag = self._ida_search.BIN_SEARCH_BACKWARD | self._ida_search.BIN_SEARCH_NOSHOW
+                flag = self._ida_bytes.BIN_SEARCH_BACKWARD | self._ida_bytes.BIN_SEARCH_NOSHOW
             if start is None:
                 start = self.min_address
             if end is None:
