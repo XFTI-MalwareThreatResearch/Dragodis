@@ -92,7 +92,7 @@ class IDAFunction(Function):
             return str(decompiled_code)
 
     @property
-    def stack_frame(self) -> Union[IDAStackFrame, IDA9StackFrame]:
+    def stack_frame(self) -> Union[IDAStackFrame]:
         if self._ida.ida_version < 850:
             return IDAStackFrame(self._ida, self._ida._ida_frame.get_frame(self._func_t))
         else:

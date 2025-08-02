@@ -131,20 +131,31 @@ class IDAFlatAPI(FlatAPI, IDADisassembler):
     def find_bytes(self, pattern: bytes, start: int = None, end: int = None, reverse=False) -> int:
         # Convert bytes pattern into hex separated by space format that IDA likes.
         pattern = " ".join(format(byte, "02X") for byte in pattern)
+        #In IDA 9, ida_search flags are lo longer used.
         if reverse:
-            flag = self._ida_search.SEARCH_UP
+            if self.ida_version < 850:
+                flag = self._ida_search.SEARCH_UP
+            else:
+                flag = self._ida_bytes.BIN_SEARCH_FORWARD | self._ida_search.BIN_SEARCH_NOSHOW
             if start is None:
                 start = self.max_address
             if end is None:
                 end = self.min_address
         else:
-            flag = self._ida_search.SEARCH_DOWN
+            if self.ida_version < 850:
+                flag = self._ida_search.SEARCH_DOWN
+            else:
+                flag = self._ida_search.BIN_SEARCH_BACKWARD | self._ida_search.BIN_SEARCH_NOSHOW
             if start is None:
                 start = self.min_address
             if end is None:
                 end = self.max_address
 
-        found = self._ida_search.find_binary(start, end, pattern, 16, flag)
+        if self.ida_version < 850:
+            found = self._ida_search.find_binary(start, end, pattern, 16, flag)
+        else:
+            #ida_search.find_binary() was changed to ida_bytes.find_bytes() in IDA 9
+            found = self._ida_bytes.find_bytes(pattern, range_start=start, range_end=end, radix=16, flags=flag)
         if found == self._BADADDR:
             return -1
         else:

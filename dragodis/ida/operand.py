@@ -15,7 +15,6 @@ from dragodis.interface.types import ARMShiftType
 
 if TYPE_CHECKING:
     import ida_ua
-    import ida_typeinf
     from dragodis.ida.flat import IDAFlatAPI
     from dragodis.ida.instruction import IDAInstruction
 
