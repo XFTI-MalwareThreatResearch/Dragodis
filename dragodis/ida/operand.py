@@ -122,9 +122,7 @@ class IDAOperand(Operand):
                         frame = IDAStackFrame(self._ida, frame)
                         return IDAStackVariable(self._ida, frame, member)
                 else:
-                    """
-                    Stack API was changed a ton in IDA 8.5
-                    """
+                    #Stack API was changed a ton in IDA 8.5
                     func_t = self._ida._ida_funcs.get_func(self.address)
                     tinfo = self._ida._ida_typeinf.tinfo_t()
                     tinfo.get_func_frame(func_t)

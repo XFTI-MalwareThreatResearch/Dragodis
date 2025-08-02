@@ -159,9 +159,7 @@ class IDALocalDisassembler(IDADisassembler):
         import ida_entry
         self._ida_entry = ida_entry
         try:
-            """
-            In IDA 8.5 and 9.0 API, ida_struct has been completely removed.
-            """
+            #In IDA 8.5 and 9.0 API, ida_struct has been completely removed.
             import ida_struct
             self._ida_struct = ida_struct
         except ImportError:
@@ -247,10 +245,8 @@ class IDARemoteDisassembler(IDADisassembler):
                 self._ida_exe = os.path.abspath(os.path.join(self._ida_path, filename))
                 break
         else:
-            """
-            IDA 8.5 + No longer has ida64.exe. Search for ida.exe if ida64 isnt present on a 64 bit file.
-            May be useful to eventually do a version check, but I dont think theres a scenario where ida64 is missing and ida.exe is only 32 bit.
-            """
+            #IDA 8.5 + No longer has ida64.exe. Search for ida.exe if ida64 isnt present on a 64 bit file.
+            #May be useful to eventually do a version check, but I dont think theres a scenario where ida64 is missing and ida.exe is only 32 bit.
             if is_64_bit:
                 for filename in os.listdir(self._ida_path):
                     if ida_exe_re32.match(filename):
@@ -360,9 +356,7 @@ class IDARemoteDisassembler(IDADisassembler):
         self._ida_typeinf: ida_typeinf = self._bridge.root.getmodule("ida_typeinf")
         self._ida_entry: ida_entry = self._bridge.root.getmodule("ida_entry")
         try:
-            """
-            IDA 8.5 + no longer has ida_struct.
-            """
+            #IDA 8.5 + no longer has ida_struct.
             self._ida_struct: ida_struct = self._bridge.root.getmodule("ida_struct")
         except ImportError:
             self._ida_struct = None

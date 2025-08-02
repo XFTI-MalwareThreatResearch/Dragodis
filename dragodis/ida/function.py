@@ -96,10 +96,8 @@ class IDAFunction(Function):
         if self._ida.ida_version < 850:
             return IDAStackFrame(self._ida, self._ida._ida_frame.get_frame(self._func_t))
         else:
-            """
-            The stack frame API was changed a ton in ida 8.5
-            The old version of IDAStackFrame wont work at all, uses entirely different types etc.
-            """
+            #The stack frame API was changed a ton in ida 8.5
+            #The old version of IDAStackFrame wont work at all, uses entirely different types etc.
             frame = self._ida._ida_typeinf.tinfo_t()
             frame.get_func_frame(self._func_t)
             return IDA9StackFrame(self._ida, frame)
