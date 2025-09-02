@@ -214,7 +214,7 @@ class IDARemoteDisassembler(IDADisassembler):
             )
         self._script_path = ida_server.__file__
         self._rpyc_config = dict(self._rpyc_config)
-        if timeout is None or timeout <= 0:
+        if timeout <= 0:
             #Treat zero timeouts or -1 timeouts as infinite.
             timeout = None
         self._rpyc_config["sync_request_timeout"] = timeout
