@@ -388,7 +388,7 @@ class IDARemoteDisassembler(IDADisassembler):
                 logger.debug(f"Connected to {socket_path}")
                 return link
             except socket.error:
-                time.sleep(3)
+                time.sleep(5)
                 continue
 
         raise DragodisError(f"Could not connect to {socket_path} after {retry} tries.")
@@ -408,7 +408,7 @@ class IDARemoteDisassembler(IDADisassembler):
                 logger.debug(f"Connected to {pipe_name}")
                 return link
             except pywintypes.error:
-                time.sleep(3)
+                time.sleep(5)
                 continue
 
         raise DragodisError(f"Could not connect to {pipe_name} after {retry} tries.")
