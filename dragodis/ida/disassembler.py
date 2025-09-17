@@ -388,7 +388,7 @@ class IDARemoteDisassembler(IDADisassembler):
                 logger.debug(f"Connected to {socket_path}")
                 return link
             except socket.error:
-                time.sleep(1)
+                time.sleep(3)
                 continue
 
         raise DragodisError(f"Could not connect to {socket_path} after {retry} tries.")
@@ -408,7 +408,7 @@ class IDARemoteDisassembler(IDADisassembler):
                 logger.debug(f"Connected to {pipe_name}")
                 return link
             except pywintypes.error:
-                time.sleep(1)
+                time.sleep(3)
                 continue
 
         raise DragodisError(f"Could not connect to {pipe_name} after {retry} tries.")
@@ -443,7 +443,7 @@ class IDARemoteDisassembler(IDADisassembler):
             ]
             if self._processor:
                 command.append(f"-p{self._processor}")
-            #command.append(f'"{self.input_path}"')  # Input file MUST be last!
+            command.append(f'"{self.input_path}"')  # Input file MUST be last!
 
             command = " ".join(command)
             logger.debug(f"Running IDA with command: {command}")
@@ -472,7 +472,6 @@ class IDARemoteDisassembler(IDADisassembler):
         # Keep a hold of the root remote object to prevent rpyc from prematurely closing on us.
         self._root = self._bridge.root
         self._running = True
-        self._idaapi.load_file(self.input_path, '')
         if self._analyze:
             self.analyze()
         else:
