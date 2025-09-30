@@ -103,7 +103,7 @@ class IDA9StackVariable(IDAStackVariable):
     @property
     def data_type(self) -> IDADataType:
         tif = self._ida._ida_typeinf.tinfo_t()
-        success = self._ida._ida_typeinf.guess_tinfo(tif, self._frame.get_udm_tid(self._member_index))
+        success = self._ida._ida_typeinf.guess_tinfo(tif, self._frame._frame.get_udm_tid(self._member_index))
         if not success:
             raise RuntimeError("Unexpected error getting type information.")
         return IDADataType(self._ida, tif)  #, self._member.flag & self._ida._idc.DT_TYPE)
