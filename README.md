@@ -18,6 +18,11 @@ engineers have a preferred disassembler. Dragodis allows for simple transfers
 of scripts between users of different disassemblers. Dragodis also aims to provide
 a cleaner and easier to use API than those provided by other disassemblers.
 
+This version of dragodis is very similar to the one here: https://github.com/dod-cyber-crime-center/Dragodis.
+The following changes are present:
+- Adds support for IDA 8.5 API changes
+- Attempts to fix an issue where files that have a very large autoanalysis or loading time may cause timeouts when connecting to IDA.
+
 
 ## Install
 
