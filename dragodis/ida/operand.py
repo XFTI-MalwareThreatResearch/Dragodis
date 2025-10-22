@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional, TYPE_CHECKING, Union, Tuple
 
 from dragodis.exceptions import NotExistError
-from dragodis.ida.stack import IDAStackVariable, IDAStackFrame
+from dragodis.ida.stack import IDAStackVariable, IDAStackFrame, IDA9StackFrame, IDA9StackVariable
 from dragodis.ida.variable import IDAVariable
 from dragodis.interface import Phrase
 from dragodis.interface.operand import Operand, ARMOperand, x86Operand, OperandType
@@ -112,13 +112,26 @@ class IDAOperand(Operand):
         if isinstance(value, Phrase):
             offset = value.offset
             if isinstance(offset, int):
-                stack_var = self._ida._ida_frame.get_stkvar(self.instruction._insn_t, self._op_t, value.offset)
-                if stack_var:
-                    member, _ = stack_var
+                if self._ida.ida_version < 850:
+                    stack_var = self._ida._ida_frame.get_stkvar(self.instruction._insn_t, self._op_t, value.offset)
+                    if stack_var:
+                        member, _ = stack_var
+                        func_t = self._ida._ida_funcs.get_func(self.address)
+                        frame = self._ida._ida_frame.get_frame(func_t)
+                        frame = IDAStackFrame(self._ida, frame)
+                        return IDAStackVariable(self._ida, frame, member)
+                else:
+                    #Stack API was changed a ton in IDA 8.5
                     func_t = self._ida._ida_funcs.get_func(self.address)
-                    frame = self._ida._ida_frame.get_frame(func_t)
-                    frame = IDAStackFrame(self._ida, frame)
-                    return IDAStackVariable(self._ida, frame, member)
+                    tinfo = self._ida._ida_typeinf.tinfo_t()
+                    tinfo.get_func_frame(func_t)
+                    status = tinfo.get_stkvar(self.instruction._insn_t, self._op_t, value.offset)
+                    if status != -1:
+                        status, stack_var = tinfo.get_udm(status)
+                        if status != -1:
+                            frame = IDA9StackFrame(self._ida, tinfo)
+                            return IDA9StackVariable(self._ida, frame, stack_var)
+
 
         elif isinstance(value, int):  # memory or immediate
             try:

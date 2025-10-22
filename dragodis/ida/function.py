@@ -1,10 +1,10 @@
 from __future__ import annotations
 import logging
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING, Union
 
 from dragodis.exceptions import *
 from dragodis.ida.flowchart import IDAFlowchart
-from dragodis.ida.stack import IDAStackFrame
+from dragodis.ida.stack import IDAStackFrame, IDA9StackFrame
 from dragodis.interface import Function, CommentType
 
 if TYPE_CHECKING:
@@ -93,7 +93,14 @@ class IDAFunction(Function):
 
     @property
     def stack_frame(self) -> IDAStackFrame:
-        return IDAStackFrame(self._ida, self._ida._ida_frame.get_frame(self._func_t))
+        if self._ida.ida_version < 850:
+            return IDAStackFrame(self._ida, self._ida._ida_frame.get_frame(self._func_t))
+        else:
+            #The stack frame API was changed a ton in ida 8.5
+            #The old version of IDAStackFrame wont work at all, uses entirely different types etc.
+            frame = self._ida._ida_typeinf.tinfo_t()
+            frame.get_func_frame(self._func_t)
+            return IDA9StackFrame(self._ida, frame)
 
     @property
     def is_library(self) -> bool:

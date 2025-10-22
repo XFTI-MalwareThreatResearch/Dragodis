@@ -158,8 +158,12 @@ class IDALocalDisassembler(IDADisassembler):
         self._ida_typeinf = ida_typeinf
         import ida_entry
         self._ida_entry = ida_entry
-        import ida_struct
-        self._ida_struct = ida_struct
+        try:
+            #In IDA 8.5 and 9.0 API, ida_struct has been completely removed.
+            import ida_struct
+            self._ida_struct = ida_struct
+        except ImportError:
+            self._ida_struct = None
         import ida_frame
         self._ida_frame = ida_frame
         import ida_search
@@ -184,7 +188,7 @@ class IDARemoteDisassembler(IDADisassembler):
         "sync_request_timeout": 60
     }
 
-    def __init__(self, input_path, is_64_bit=None, ida_path=None, timeout=None, processor=None, detach=False, **unused):
+    def __init__(self, input_path, is_64_bit=None, ida_path=None, timeout=60, processor=None, detach=False, analyze=True, **unused):
         """
         Initializes IDA disassembler.
 
@@ -199,6 +203,7 @@ class IDARemoteDisassembler(IDADisassembler):
         :param detach: Detach the IDA subprocess from the parent process group.
             This will cause signals to no longer propagate.
             (Linux only)
+        :param analyze: Determines whether autoanalysis should be conducted on the input file at IDA startup.
         """
         super().__init__(input_path, processor=processor)
         self._ida_path = ida_path or os.environ.get("IDA_INSTALL_DIR", os.environ.get("IDA_DIR"))
@@ -208,9 +213,11 @@ class IDARemoteDisassembler(IDADisassembler):
                 "Please provide it during instantiation or set the IDA_INSTALL_DIR environment variable."
             )
         self._script_path = ida_server.__file__
-        if timeout is not None:
-            self._rpyc_config = dict(self._rpyc_config)
-            self._rpyc_config["sync_request_timeout"] = timeout
+        self._rpyc_config = dict(self._rpyc_config)
+        if timeout is not None and timeout <= 0:
+            #Treat zero timeouts or -1 timeouts as infinite.
+            timeout = None
+        self._rpyc_config["sync_request_timeout"] = timeout
 
         # Determine if 64 bit.
         if is_64_bit is None:
@@ -229,17 +236,33 @@ class IDARemoteDisassembler(IDADisassembler):
 
         # Find ida executable within ida_dir.
         # TODO: Should we just always open with ida64?
-        ida_exe_re = re.compile(r"idaq?64(\.exe)?$" if is_64_bit else r"idaq?(\.exe)?$")
+        ida_exe_re64 = re.compile(r"idaq?64(\.exe)?$")
+        ida_exe_re32 = re.compile(r"idaq?(\.exe)?$")
+        if is_64_bit:
+            ida_exe_re = ida_exe_re64
+        else:
+            ida_exe_re = ida_exe_re32
+        self._ida_exe = None
         for filename in os.listdir(self._ida_path):
             if ida_exe_re.match(filename):
                 self._ida_exe = os.path.abspath(os.path.join(self._ida_path, filename))
                 break
         else:
+            #IDA 8.5 + No longer has ida64.exe. Search for ida.exe if ida64 isnt present on a 64 bit file.
+            #May be useful to eventually do a version check, but I dont think theres a scenario where ida64 is missing and ida.exe is only 32 bit.
+            if is_64_bit:
+                for filename in os.listdir(self._ida_path):
+                    if ida_exe_re32.match(filename):
+                        self._ida_exe = os.path.abspath(os.path.join(self._ida_path, filename))
+                        break
+
+        if self._ida_exe is None:
             raise NotInstalledError(f"Unable to find ida executable within: {self._ida_path}")
 
         self._running = False
 
         self._detach = detach and sys.platform != "win32"
+        self._analyze = analyze
         self._socket_path = None
         self._process = None
         self._bridge = None
@@ -336,7 +359,11 @@ class IDARemoteDisassembler(IDADisassembler):
         self._ida_loader: ida_loader = self._bridge.root.getmodule("ida_loader")
         self._ida_typeinf: ida_typeinf = self._bridge.root.getmodule("ida_typeinf")
         self._ida_entry: ida_entry = self._bridge.root.getmodule("ida_entry")
-        self._ida_struct: ida_struct = self._bridge.root.getmodule("ida_struct")
+        try:
+            #IDA 8.5 + no longer has ida_struct.
+            self._ida_struct: ida_struct = self._bridge.root.getmodule("ida_struct")
+        except ImportError:
+            self._ida_struct = None
         self._ida_frame: ida_frame = self._bridge.root.getmodule("ida_frame")
         self._ida_search: ida_search = self._bridge.root.getmodule("ida_search")
 
@@ -348,7 +375,7 @@ class IDARemoteDisassembler(IDADisassembler):
         self._ida_intel: ida_intel = self._bridge.root.getmodule("ida_intel")
         self._ida_helpers: ida_helpers = self._bridge.root.getmodule("ida_helpers")
 
-    def unix_connect(self, socket_path, retry=10) -> rpyc.Connection:
+    def unix_connect(self, socket_path, retry=20) -> rpyc.Connection:
         """
         Connects to bridge using unix socket.
         """
@@ -361,12 +388,12 @@ class IDARemoteDisassembler(IDADisassembler):
                 logger.debug(f"Connected to {socket_path}")
                 return link
             except socket.error:
-                time.sleep(1)
+                time.sleep(5)
                 continue
 
         raise DragodisError(f"Could not connect to {socket_path} after {retry} tries.")
 
-    def win_connect(self, pipe_name, retry=10) -> rpyc.Connection:
+    def win_connect(self, pipe_name, retry=20) -> rpyc.Connection:
         """
         Connects to bridge using Windows named pipe.
         """
@@ -381,7 +408,7 @@ class IDARemoteDisassembler(IDADisassembler):
                 logger.debug(f"Connected to {pipe_name}")
                 return link
             except pywintypes.error:
-                time.sleep(1)
+                time.sleep(5)
                 continue
 
         raise DragodisError(f"Could not connect to {pipe_name} after {retry} tries.")
@@ -409,6 +436,7 @@ class IDARemoteDisassembler(IDADisassembler):
             command = [
                 self._ida_exe,
                 "-P",
+                "-a",
                 "-A",
                 f'-S""{script_path}" "{pipe_name or socket_path}""',
                 f'-L"{self.input_path}_ida.log"',
@@ -429,7 +457,7 @@ class IDARemoteDisassembler(IDADisassembler):
             atexit.register(self._process.kill)
         finally:
             os.chdir(orig_cwd)
-
+    
         logger.debug(f"Initializing IDA Bridge connection...")
         if socket_path:
             self._bridge = self.unix_connect(socket_path)
@@ -439,12 +467,15 @@ class IDARemoteDisassembler(IDADisassembler):
             self._bridge = self.win_connect(pipe_name)
         else:
             raise RuntimeError("Unexpected error. Failed to setup socket or pipe.")
+
         self._initialize_bridge()
         # Keep a hold of the root remote object to prevent rpyc from prematurely closing on us.
         self._root = self._bridge.root
         self._running = True
-        self._idc.auto_wait()
-
+        if self._analyze:
+            self.analyze()
+        else:
+            logger.debug('Skipping autoanalysis.')
         logger.debug("IDA Disassembler ready!")
 
     def stop(self, *exc_info):
@@ -506,6 +537,18 @@ class IDARemoteDisassembler(IDADisassembler):
         Good for functions that we don't care to get results back from.
         """
         return rpyc.async_(proxy_func)
+    
+    def analyze(self) -> None:
+        """
+        Instruct IDA to initiate and wait for auto analysis completion.
+        """
+        if not self._running:
+            logger.error('Cannot run IDARemoteDisassembler.analyze() without a connected IDA instance.')
+            return
+        logger.debug('Running autoanalysis.')
+        self._idc.set_flag(self._idc.INF_GENFLAGS, self._idc.INFFL_AUTO, 1)
+        #To avoid timeouts, run it as async but block until complete here.
+        self._async(self._idc.auto_wait)().wait()
 
     def teleport(self, func: Callable) -> Callable:
         def wrapper(*args, **kwargs):
