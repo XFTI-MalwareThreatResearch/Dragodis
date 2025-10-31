@@ -163,7 +163,7 @@ class IDAARMOperand(IDAOperand, ARMOperand):
             # I believe we determine which one it is based on whether op.value is zero.
             shift_count = self._op_t.value
             if not shift_count:
-                shift_count = IDARegister(self._ida, self._ida._ida_arm.secreg(self._op), self.width)
+                shift_count = IDARegister(self._ida, self._ida._ida_arm.secreg(self._op_t), self.width)
             return ARMShiftType(self._op_t.specflag2), shift_count
 
         return ARMShiftType.LSL, 0  # not shifted
