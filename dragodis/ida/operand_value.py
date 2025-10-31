@@ -32,6 +32,9 @@ class IDARegister(Register):
         self._reg = reg
         self._width = width
 
+    def __hash__(self):
+        return hash(self.name)
+
     def __eq__(self, other: "IDARegister"):
         if isinstance(other, IDARegister):
             return self._reg == other._reg and self._width == other._width
